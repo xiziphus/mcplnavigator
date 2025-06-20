@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Machine Work Order Assignment</title>
+    <style>
+        /* Basic styling for layout */
+        body { font-family: sans-serif; display: flex; gap: 20px; }
+        .panel { border: 1px solid #ccc; padding: 10px; border-radius: 5px; width: 23%; /* Adjusted for 4 panels */ }
+        .machine-list, .wo-list, .mqtt-log-display, .failed-prints-display {
+            min-height: 400px;
+            max-height: 600px; /* Or any height you prefer */
+            overflow-y: auto;
+            border: 1px dashed #ddd;
+            padding: 5px;
+            font-size: 0.9em;
+            /* white-space: pre-wrap; // Keep for MQTT log, but textarea will handle ZPL */
+            word-break: break-all;
+        }
+        .mqtt-log-display p, .failed-prints-display div {
+             white-space: pre-wrap; /* Ensure newlines are respected */
+             border-bottom: 1px solid #eee;
+             padding-bottom: 2px;
+             margin-bottom: 2px;
+        }
+        .failed-prints-display textarea {
+            width: 98%;
+            min-height: 100px;
+            font-family: monospace;
+            font-size: 0.8em;
+            margin-top: 5px;
+        }
+        .item { padding: 8px; margin: 4px 0; border: 1px solid #eee; background: #f9f9f9; cursor: grab; }
+        .assigned { background: #e0ffe0; }
+        .drop-target { border: 2px dashed lightblue; background: #f0f8ff; }
+        h2 { margin-top: 0; }
+        button { margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+
+    <div class="panel">
+        <h2>Available Extrusion Work Orders</h2>
+        <input type="text" id="created-at-min" placeholder="YYYY-MM-DD">
+        <button id="fetch-btn">Fetch from NetSuite</button><br>
+        <input type="text" id="process-filter" placeholder="Filter by MFG Process" style="margin-top: 10px; width: calc(50% - 16px);">
+        <input type="text" id="location-filter" placeholder="Filter by Location" style="margin-top: 10px; width: calc(50% - 16px);">
+        <div id="wo-list" class="wo-list">
+            <!-- Work orders will be loaded here -->
+        </div>
+    </div>
+
+    <div class="panel">
+        <h2>Machine Assignments</h2>
+        <div id="machine-list" class="machine-list">
+            <!-- Machines will be loaded here -->
+        </div>
+    </div>
+
+    <div class="panel">
+        <h2>Live MQTT Log</h2>
+        <div id="mqtt-log-display" class="mqtt-log-display">
+            <!-- MQTT messages will be loaded here -->
+        </div>
+    </div>
+
+    <div class="panel">
+        <h2>Failed Prints / ZPL Inspector</h2>
+        <div id="failed-prints-display" class="failed-prints-display">
+            <!-- Failed prints will be loaded here -->
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://127.0.0.1:3001'; // Your FastAPI server URL
+
+        const woList = document.getElementById('wo-list');
+        const machineList = document.getElementById('machine-list');
+        const mqttLogDisplay = document.getElementById('mqtt-log-display');
+        const failedPrintsDisplay = document.getElementById('failed-prints-display');
+        // const refreshBtn = document.getElementById('refresh-btn'); // Already have fetchBtn
+        const processFilterInput = document.getElementById('process-filter');
+        const locationFilterInput = document.getElementById('location-filter');
+
+        // Make items draggable
+        function makeDraggable(item) {
+            item.setAttribute('draggable', true);
+            item.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('work_order_id', item.dataset.id);
+                e.dataTransfer.setData('work_order_text', item.textContent);
+            });
+        }
+        
+        // Make machine a drop target
+        function makeDroppable(machine) {
+            machine.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                machine.classList.add('drop-target');
+            });
+            machine.addEventListener('dragleave', () => {
+                machine.classList.remove('drop-target');
+            });
+            machine.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                machine.classList.remove('drop-target');
+                const workOrderId = e.dataTransfer.getData('work_order_id');
+                const workOrderText = e.dataTransfer.getData('work_order_text');
+                const machineId = machine.dataset.id;
+                
+                // API call to update assignment
+                await fetch(`${API_BASE_URL}/api/update-assignment`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        machine_id: parseInt(machineId),
+                        work_order_id: parseInt(workOrderId),
+                        is_printing_active: true // Default to active on drop
+                    })
+                });
+                
+                // Refresh UI
+                loadData();
+            });
+        }
+        
+        async function loadData() {
+            const response = await fetch(`${API_BASE_URL}/api/dashboard-data`);
+            const data = await response.json();
+
+            // Populate Work Orders
+            woList.innerHTML = '<h4>Drag a WO to a Machine</h4>';
+            
+            const processFilterText = processFilterInput.value.toLowerCase();
+            const locationFilterText = locationFilterInput.value.toLowerCase();
+
+            const filteredWorkOrders = data.work_orders.filter(wo => {
+                const processMatch = !processFilterText || (wo.mfg_process_name || '').toLowerCase().includes(processFilterText);
+                const locationMatch = !locationFilterText || (wo.location || '').toLowerCase().includes(locationFilterText);
+                return processMatch && locationMatch;
+            });
+
+            filteredWorkOrders.forEach(wo => {
+                const div = document.createElement('div');
+                div.className = 'item';
+                div.dataset.id = wo.id;
+                div.innerHTML = `
+                    <strong>WO: ${wo.work_order_no || 'N/A'}</strong> (Date: ${wo.work_order_date || 'N/A'}) (Process: ${wo.mfg_process_name || 'N/A'})<br>
+                    MCPL P/N: ${wo.mcpl_part_code || 'N/A'} (Qty: ${wo.total_quantity || 'N/A'})<br>
+                    Cust P/N: ${wo.customer_part_code || 'N/A'}<br>
+                    Location: ${wo.location || 'N/A'}<br>
+                    Wire Type: ${wo.wire_type || 'N/A'}<br>
+                    Gauge: ${wo.guage || 'N/A'}<br>
+                    Color: ${wo.main_color || 'N/A'} / ${wo.bi_color || 'N/A'}
+                `;
+                makeDraggable(div);
+                woList.appendChild(div);
+            });
+
+            // Populate Machines
+            machineList.innerHTML = '';
+            data.assignments.forEach(m => {
+                const div = document.createElement('div');
+                div.className = 'item assigned';
+                div.dataset.id = m.machine_id;
+                div.innerHTML = `<strong>${m.equipment_name}</strong><br>
+                    <span>Assigned WO: ${m.work_order_no || 'None'}</span><br>
+                    <span>Printing: <strong>${m.is_printing_active ? 'ACTIVE' : 'INACTIVE'}</strong></span><br>
+                    <span>Total Coils: ${m.total_coils_produced !== undefined ? m.total_coils_produced : 'N/A'}</span><br>
+                    <span>Recent S/N: ${m.recent_coil_serial_number || 'N/A'}</span><br>
+                    <span>Recent Qty: ${m.recent_coil_quantity !== undefined ? m.recent_coil_quantity : 'N/A'}</span><br>
+                    <span>Total Qty Made: ${m.total_quantity_made !== undefined ? m.total_quantity_made : 'N/A'}</span><br>
+                    <span>Recent Print Status: ${m.recent_print_status || 'N/A'}</span><br>
+                    <span>Error: ${m.recent_error_message || 'None'}</span>
+                    <button class="toggle-btn" data-machine-id="${m.machine_id}" data-wo-id="${m.work_order_id}" data-active="${m.is_printing_active}">
+                        ${m.is_printing_active ? 'Deactivate' : 'Activate'}
+                    </button>`;
+                makeDroppable(div);
+                machineList.appendChild(div);
+            });
+
+            // Add event listeners to new toggle buttons
+            document.querySelectorAll('.toggle-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const machineId = e.target.dataset.machineId;
+                    const workOrderId = e.target.dataset.woId;
+                    const isActive = e.target.dataset.active === 'true';
+
+                    if (!workOrderId || workOrderId === 'null') {
+                        alert("No Work Order assigned. Cannot toggle printing.");
+                        return;
+                    }
+                    
+                    await fetch(`${API_BASE_URL}/api/update-assignment`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            machine_id: parseInt(machineId),
+                            work_order_id: parseInt(workOrderId),
+                            is_printing_active: !isActive
+                        })
+                    });
+                    loadData(); // Refresh UI
+                });
+            });
+        }
+        
+        const fetchBtn = document.getElementById('fetch-btn');
+        const createdAtMinInput = document.getElementById('created-at-min');
+
+        fetchBtn.addEventListener('click', async () => {
+            const createdAtMin = createdAtMinInput.value;
+            if (!createdAtMin) {
+                alert("Please enter a date in YYYY-MM-DD format.");
+                return;
+            }
+
+            fetchBtn.textContent = 'Fetching...';
+            await fetch(`${API_BASE_URL}/api/fetch-netsuite-orders`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ created_at_min: createdAtMin })
+            });
+            fetchBtn.textContent = 'Fetch from NetSuite';
+            loadData();
+        });
+
+        processFilterInput.addEventListener('keyup', loadData);
+        locationFilterInput.addEventListener('keyup', loadData); // Re-filter and load data on keyup
+
+        // Initial load
+        loadData();
+
+        async function loadMqttLog() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/mqtt-log`);
+                if (!response.ok) {
+                    console.error("Failed to fetch MQTT log:", response.status);
+                    // mqttLogDisplay.innerHTML = "<p>Error fetching MQTT log.</p>";
+                    return;
+                }
+                const data = await response.json();
+                mqttLogDisplay.innerHTML = ''; // Clear previous logs
+                // Display newest messages first
+                data.log.slice().reverse().forEach(logEntry => {
+                    const p = document.createElement('p');
+                    p.style.margin = '2px 0';
+                    p.style.borderBottom = '1px solid #eee';
+                    p.style.paddingBottom = '2px';
+                    p.textContent = logEntry;
+                    mqttLogDisplay.appendChild(p);
+                });
+            } catch (error) {
+                console.error("Error fetching or processing MQTT log:", error);
+                // mqttLogDisplay.innerHTML = "<p>Error fetching MQTT log.</p>";
+            }
+        }
+
+        // Load MQTT log periodically
+        setInterval(loadMqttLog, 3000); // Refresh every 3 seconds
+        loadMqttLog(); // Initial load
+
+        async function loadFailedPrints() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/failed-prints`);
+                if (!response.ok) {
+                    console.error("Failed to fetch failed prints:", response.status);
+                    failedPrintsDisplay.innerHTML = "<p>Error fetching failed prints.</p>";
+                    return;
+                }
+                const failedPrints = await response.json();
+                failedPrintsDisplay.innerHTML = '<h4>Recent Failed Prints:</h4>';
+                if (failedPrints.length === 0) {
+                    failedPrintsDisplay.innerHTML += "<p>No failed prints found.</p>";
+                    return;
+                }
+
+                failedPrints.forEach(fp => {
+                    const entryDiv = document.createElement('div');
+                    entryDiv.className = 'failed-print-item';
+                    
+                    let errorMessage = fp.error_message || 'No error message';
+                    // Basic check for WinError to make it more readable
+                    if (errorMessage.includes('[WinError')) {
+                        errorMessage = errorMessage.split('(')[0].trim() + " (Check console for details)";
+                    }
+
+
+                    entryDiv.innerHTML = `
+                        <p><strong>S/N:</strong> ${fp.serial_number}</p>
+                        <p><strong>WO:</strong> ${fp.work_order_no} | <strong>Machine:</strong> ${fp.machine_id}</p>
+                        <p><strong>Time:</strong> ${fp.print_timestamp}</p>
+                        <p><strong>Error:</strong> ${errorMessage}</p>
+                        <p><strong>ZPL Code:</strong></p>
+                        <textarea readonly>${fp.zpl_content || 'N/A'}</textarea>
+                    `;
+                    failedPrintsDisplay.appendChild(entryDiv);
+                });
+            } catch (error) {
+                console.error("Error fetching or processing failed prints:", error);
+                failedPrintsDisplay.innerHTML = "<p>Error fetching failed prints.</p>";
+            }
+        }
+        loadFailedPrints(); // Initial load
+        // Consider adding a refresh button or refreshing it with loadData() if appropriate
+        // For now, it loads once. If you want it to refresh when loadData() is called:
+        // make sure loadData() calls loadFailedPrints()
+
+    </script>
+</body>
+</html>

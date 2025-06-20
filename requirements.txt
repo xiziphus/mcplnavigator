@@ -1,0 +1,11 @@
+paho-mqtt
+python-dotenv
+aiomysql
+sqlalchemy
+httpx
+pygelf
+fastapi
+uvicorn[standard]
+python-multipart
+aiosqlite
+pywin32

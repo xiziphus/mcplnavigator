@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Machine Work Order Assignment</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(180deg, #f8f9fa 0%, #e3f2fd 50%, #ffebee 100%);
+            height: 100vh;
+            padding: 16px;
+            color: #333;
+            overflow: hidden;
+        }
+
+        .container {
+            height: calc(100vh - 32px);
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: 1fr;
+            gap: 16px;
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .panel:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .panel-header {
+            background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+            color: white;
+            padding: 16px;
+            position: relative;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+
+        .panel-header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            animation: shimmer 3s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .panel-header h2 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin: 0;
+            position: relative;
+            z-index: 1;
+        }
+
+        .panel-content {
+            padding: 16px;
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            background: rgba(255, 255, 255, 0.7);
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 12px;
+            flex-shrink: 0;
+        }
+
+        .input-group {
+            flex: 1;
+            min-width: 120px;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 2px solid #e1e8ed;
+            border-radius: 6px;
+            font-size: 12px;
+            transition: all 0.3s ease;
+            background: #fff;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+            transform: translateY(-1px);
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #2196f3, #1976d2);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(33, 150, 243, 0.4);
+        }
+
+        .btn-toggle {
+            padding: 6px 12px;
+            font-size: 10px;
+            margin-top: 6px;
+            min-width: 70px;
+        }
+
+        .btn-activate {
+            background: linear-gradient(135deg, #4caf50, #388e3c);
+            color: white;
+        }
+
+        .btn-deactivate {
+            background: linear-gradient(135deg, #f44336, #d32f2f);
+            color: white;
+        }
+
+        .scrollable-content {
+            flex: 1;
+            overflow-y: auto;
+            padding-right: 8px;
+        }
+
+        .scrollable-content::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .scrollable-content::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+
+        .scrollable-content::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #2196f3, #1976d2);
+            border-radius: 10px;
+        }
+
+        .item {
+            background: white;
+            border: 2px solid #e1e8ed;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 8px;
+            cursor: grab;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #2196f3, #f44336);
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
+        }
+
+        .item:hover {
+            transform: translateX(4px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            border-color: #2196f3;
+        }
+
+        .item:hover::before {
+            transform: scaleX(1);
+        }
+
+        .item:active {
+            cursor: grabbing;
+            transform: scale(0.98);
+        }
+
+        .assigned {
+            background: linear-gradient(135deg, #e8f5e8 0%, #fefefe 100%);
+            border-color: #4caf50;
+        }
+
+        .assigned::before {
+            background: linear-gradient(90deg, #4caf50, #66bb6a);
+            transform: scaleX(1);
+        }
+
+        .drop-target {
+            border-color: #2196f3 !important;
+            background: linear-gradient(135deg, #e3f2fd 0%, #fefefe 100%) !important;
+            transform: translateX(8px);
+            box-shadow: 0 0 15px rgba(33, 150, 243, 0.3);
+        }
+
+        .work-order-item strong {
+            color: #2c3e50;
+            font-size: 1.1em;
+        }
+
+        .work-order-details {
+            margin-top: 6px;
+            font-size: 0.8em;
+            color: #5a6c7d;
+            line-height: 1.3;
+        }
+
+        .machine-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .machine-name {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .status-active {
+            color: #4caf50;
+            font-weight: 600;
+        }
+
+        .status-inactive {
+            color: #f44336;
+            font-weight: 600;
+        }
+
+        .log-entry {
+            background: #f8f9fa;
+            border-left: 3px solid #2196f3;
+            padding: 8px;
+            margin-bottom: 6px;
+            border-radius: 0 6px 6px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.75em;
+            line-height: 1.3;
+            transition: all 0.3s ease;
+        }
+
+        .log-entry:hover {
+            background: #e3f2fd;
+            transform: translateX(3px);
+        }
+
+        .failed-print-item {
+            background: #ffebee;
+            border: 1px solid #ffcdd2;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .failed-print-item:hover {
+            box-shadow: 0 3px 12px rgba(244, 67, 54, 0.1);
+        }
+
+        .failed-print-item strong {
+            color: #c62828;
+        }
+
+        .failed-print-item textarea {
+            width: 100%;
+            min-height: 80px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.75em;
+            margin-top: 6px;
+            background: #f8f9fa;
+            resize: vertical;
+        }
+
+        .section-title {
+            font-size: 1em;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 12px;
+            padding-bottom: 6px;
+            border-bottom: 2px solid #ecf0f1;
+            flex-shrink: 0;
+        }
+
+        .loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+
+        @media (max-width: 1400px) {
+            .container {
+                grid-template-columns: repeat(2, 1fr);
+                grid-template-rows: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 8px;
+            }
+            
+            .container {
+                height: calc(100vh - 16px);
+                grid-template-columns: 1fr;
+                grid-template-rows: repeat(4, 1fr);
+                gap: 8px;
+            }
+            
+            .controls {
+                flex-direction: column;
+                gap: 6px;
+            }
+            
+            .input-group {
+                min-width: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Work Orders Panel -->
+        <div class="panel">
+            <div class="panel-header">
+                <h2>📋 Available Extrusion Work Orders</h2>
+            </div>
+            <div class="panel-content">
+                <div class="controls">
+                    <div class="input-group">
+                        <input type="date" id="created-at-min" placeholder="Select date">
+                    </div>
+                    <button id="fetch-btn" class="btn btn-primary">🔄 Fetch from NetSuite</button>
+                </div>
+                <div class="controls">
+                    <div class="input-group">
+                        <input type="text" id="process-filter" placeholder="🔍 Filter by MFG Process">
+                    </div>
+                    <div class="input-group">
+                        <input type="text" id="location-filter" placeholder="📍 Filter by Location">
+                    </div>
+                </div>
+                <div id="wo-list" class="scrollable-content">
+                    <div class="section-title">Drag a Work Order to a Machine</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Machine Assignments Panel -->
+        <div class="panel">
+            <div class="panel-header">
+                <h2>🏭 Machine Assignments</h2>
+            </div>
+            <div class="panel-content">
+                <div id="machine-list" class="scrollable-content">
+                    <!-- Machines will be loaded here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- MQTT Log Panel -->
+        <div class="panel">
+            <div class="panel-header">
+                <h2>📡 Live MQTT Log</h2>
+            </div>
+            <div class="panel-content">
+                <div id="mqtt-log-display" class="scrollable-content">
+                    <!-- MQTT messages will be loaded here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Failed Prints Panel -->
+        <div class="panel">
+            <div class="panel-header">
+                <h2>⚠️ Failed Prints / ZPL Inspector</h2>
+            </div>
+            <div class="panel-content">
+                <div id="failed-prints-display" class="scrollable-content">
+                    <!-- Failed prints will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://127.0.0.1:3001'; // Your FastAPI server URL
+
+        const woList = document.getElementById('wo-list');
+        const machineList = document.getElementById('machine-list');
+        const mqttLogDisplay = document.getElementById('mqtt-log-display');
+        const failedPrintsDisplay = document.getElementById('failed-prints-display');
+        const processFilterInput = document.getElementById('process-filter');
+        const locationFilterInput = document.getElementById('location-filter');
+
+        // Make items draggable
+        function makeDraggable(item) {
+            item.setAttribute('draggable', true);
+            item.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('work_order_id', item.dataset.id);
+                e.dataTransfer.setData('work_order_text', item.textContent);
+                item.style.opacity = '0.5';
+            });
+            item.addEventListener('dragend', (e) => {
+                item.style.opacity = '1';
+            });
+        }
+        
+        // Make machine a drop target
+        function makeDroppable(machine) {
+            machine.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                machine.classList.add('drop-target');
+            });
+            machine.addEventListener('dragleave', () => {
+                machine.classList.remove('drop-target');
+            });
+            machine.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                machine.classList.remove('drop-target');
+                const workOrderId = e.dataTransfer.getData('work_order_id');
+                const workOrderText = e.dataTransfer.getData('work_order_text');
+                const machineId = machine.dataset.id;
+                
+                // Show loading state
+                machine.classList.add('loading');
+                
+                try {
+                    // API call to update assignment
+                    await fetch(`${API_BASE_URL}/api/update-assignment`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            machine_id: parseInt(machineId),
+                            work_order_id: parseInt(workOrderId),
+                            is_printing_active: true // Default to active on drop
+                        })
+                    });
+                    
+                    // Refresh UI
+                    await loadData();
+                } catch (error) {
+                    console.error('Error updating assignment:', error);
+                } finally {
+                    machine.classList.remove('loading');
+                }
+            });
+        }
+        
+        async function loadData() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/dashboard-data`);
+                const data = await response.json();
+
+                // Populate Work Orders
+                const processFilterText = processFilterInput.value.toLowerCase();
+                const locationFilterText = locationFilterInput.value.toLowerCase();
+
+                const filteredWorkOrders = data.work_orders.filter(wo => {
+                    const processMatch = !processFilterText || (wo.mfg_process_name || '').toLowerCase().includes(processFilterText);
+                    const locationMatch = !locationFilterText || (wo.location || '').toLowerCase().includes(locationFilterText);
+                    return processMatch && locationMatch;
+                });
+
+                woList.innerHTML = '<div class="section-title">Drag a Work Order to a Machine</div>';
+                
+                filteredWorkOrders.forEach(wo => {
+                    const div = document.createElement('div');
+                    div.className = 'item work-order-item';
+                    div.dataset.id = wo.id;
+                    div.innerHTML = `
+                        <div class="machine-name">WO: ${wo.work_order_no || 'N/A'}</div>
+                        <div class="work-order-details">
+                            <div><strong>Date:</strong> ${wo.work_order_date || 'N/A'} | <strong>Process:</strong> ${wo.mfg_process_name || 'N/A'}</div>
+                            <div><strong>MCPL P/N:</strong> ${wo.mcpl_part_code || 'N/A'} <strong>Qty:</strong> ${wo.total_quantity || 'N/A'}</div>
+                            <div><strong>Customer P/N:</strong> ${wo.customer_part_code || 'N/A'}</div>
+                            <div><strong>Location:</strong> ${wo.location || 'N/A'} | <strong>Wire:</strong> ${wo.wire_type || 'N/A'}</div>
+                            <div><strong>Gauge:</strong> ${wo.guage || 'N/A'} | <strong>Colors:</strong> ${wo.main_color || 'N/A'} / ${wo.bi_color || 'N/A'}</div>
+                        </div>
+                    `;
+                    makeDraggable(div);
+                    woList.appendChild(div);
+                });
+
+                // Populate Machines
+                machineList.innerHTML = '';
+                data.assignments.forEach(m => {
+                    const div = document.createElement('div');
+                    div.className = 'item assigned';
+                    div.dataset.id = m.machine_id;
+                    
+                    const isActive = m.is_printing_active;
+                    const statusClass = isActive ? 'status-active' : 'status-inactive';
+                    const buttonClass = isActive ? 'btn-deactivate' : 'btn-activate';
+                    const buttonText = isActive ? '⏹️ Deactivate' : '▶️ Activate';
+                    
+                    div.innerHTML = `
+                        <div class="machine-info">
+                            <div class="machine-name">🏭 ${m.equipment_name}</div>
+                            <div><strong>Assigned WO:</strong> ${m.work_order_no || 'None'}</div>
+                            <div><strong>Status:</strong> <span class="${statusClass}">${isActive ? '🟢 ACTIVE' : '🔴 INACTIVE'}</span></div>
+                            <div><strong>Total Coils:</strong> ${m.total_coils_produced !== undefined ? m.total_coils_produced : 'N/A'}</div>
+                            <div><strong>Recent S/N:</strong> ${m.recent_coil_serial_number || 'N/A'}</div>
+                            <div><strong>Recent Qty:</strong> ${m.recent_coil_quantity !== undefined ? m.recent_coil_quantity : 'N/A'}</div>
+                            <div><strong>Total Made:</strong> ${m.total_quantity_made !== undefined ? m.total_quantity_made : 'N/A'}</div>
+                            <div><strong>Print Status:</strong> ${m.recent_print_status || 'N/A'}</div>
+                            <div><strong>Error:</strong> ${m.recent_error_message || 'None'}</div>
+                            <button class="btn btn-toggle ${buttonClass}" data-machine-id="${m.machine_id}" data-wo-id="${m.work_order_id}" data-active="${isActive}">
+                                ${buttonText}
+                            </button>
+                        </div>
+                    `;
+                    makeDroppable(div);
+                    machineList.appendChild(div);
+                });
+
+                // Add event listeners to new toggle buttons
+                document.querySelectorAll('.btn-toggle').forEach(btn => {
+                    btn.addEventListener('click', async (e) => {
+                        const machineId = e.target.dataset.machineId;
+                        const workOrderId = e.target.dataset.woId;
+                        const isActive = e.target.dataset.active === 'true';
+
+                        if (!workOrderId || workOrderId === 'null') {
+                            alert("⚠️ No Work Order assigned. Cannot toggle printing.");
+                            return;
+                        }
+                        
+                        // Show loading state
+                        e.target.classList.add('loading');
+                        e.target.textContent = '⏳ Processing...';
+                        
+                        try {
+                            await fetch(`${API_BASE_URL}/api/update-assignment`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    machine_id: parseInt(machineId),
+                                    work_order_id: parseInt(workOrderId),
+                                    is_printing_active: !isActive
+                                })
+                            });
+                            await loadData(); // Refresh UI
+                        } catch (error) {
+                            console.error('Error toggling machine status:', error);
+                            e.target.classList.remove('loading');
+                            e.target.textContent = isActive ? '⏹️ Deactivate' : '▶️ Activate';
+                        }
+                    });
+                });
+            } catch (error) {
+                console.error('Error loading data:', error);
+            }
+        }
+        
+        const fetchBtn = document.getElementById('fetch-btn');
+        const createdAtMinInput = document.getElementById('created-at-min');
+
+        fetchBtn.addEventListener('click', async () => {
+            const createdAtMin = createdAtMinInput.value;
+            if (!createdAtMin) {
+                alert("⚠️ Please select a date.");
+                return;
+            }
+
+            fetchBtn.classList.add('loading', 'pulse');
+            fetchBtn.textContent = '⏳ Fetching...';
+            
+            try {
+                await fetch(`${API_BASE_URL}/api/fetch-netsuite-orders`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ created_at_min: createdAtMin })
+                });
+                await loadData();
+            } catch (error) {
+                console.error('Error fetching NetSuite orders:', error);
+            } finally {
+                fetchBtn.classList.remove('loading', 'pulse');
+                fetchBtn.textContent = '🔄 Fetch from NetSuite';
+            }
+        });
+
+        // Debounce function for filter inputs
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        const debouncedLoadData = debounce(loadData, 300);
+        processFilterInput.addEventListener('input', debouncedLoadData);
+        locationFilterInput.addEventListener('input', debouncedLoadData);
+
+        // Initial load
+        loadData();
+
+        async function loadMqttLog() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/mqtt-log`);
+                if (!response.ok) {
+                    console.error("Failed to fetch MQTT log:", response.status);
+                    return;
+                }
+                const data = await response.json();
+                mqttLogDisplay.innerHTML = '';
+                
+                // Display newest messages first
+                data.log.slice().reverse().forEach(logEntry => {
+                    const div = document.createElement('div');
+                    div.className = 'log-entry';
+                    div.textContent = logEntry;
+                    mqttLogDisplay.appendChild(div);
+                });
+            } catch (error) {
+                console.error("Error fetching or processing MQTT log:", error);
+            }
+        }
+
+        // Load MQTT log periodically
+        setInterval(loadMqttLog, 3000); // Refresh every 3 seconds
+        loadMqttLog(); // Initial load
+
+        async function loadFailedPrints() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/failed-prints`);
+                if (!response.ok) {
+                    console.error("Failed to fetch failed prints:", response.status);
+                    failedPrintsDisplay.innerHTML = "<div class='section-title'>⚠️ Error fetching failed prints</div>";
+                    return;
+                }
+                const failedPrints = await response.json();
+                failedPrintsDisplay.innerHTML = '<div class="section-title">Recent Failed Prints</div>';
+                
+                if (failedPrints.length === 0) {
+                    failedPrintsDisplay.innerHTML += "<div class='log-entry'>✅ No failed prints found</div>";
+                    return;
+                }
+
+                failedPrints.forEach(fp => {
+                    const entryDiv = document.createElement('div');
+                    entryDiv.className = 'failed-print-item';
+                    
+                    let errorMessage = fp.error_message || 'No error message';
+                    // Basic check for WinError to make it more readable
+                    if (errorMessage.includes('[WinError')) {
+                        errorMessage = errorMessage.split('(')[0].trim() + " (Check console for details)";
+                    }
+
+                    entryDiv.innerHTML = `
+                        <div><strong>🏷️ S/N:</strong> ${fp.serial_number}</div>
+                        <div><strong>📋 WO:</strong> ${fp.work_order_no} | <strong>🏭 Machine:</strong> ${fp.machine_id}</div>
+                        <div><strong>⏰ Time:</strong> ${fp.print_timestamp}</div>
+                        <div><strong>❌ Error:</strong> ${errorMessage}</div>
+                        <div><strong>📄 ZPL Code:</strong></div>
+                        <textarea readonly>${fp.zpl_content || 'N/A'}</textarea>
+                    `;
+                    failedPrintsDisplay.appendChild(entryDiv);
+                });
+            } catch (error) {
+                console.error("Error fetching or processing failed prints:", error);
+                failedPrintsDisplay.innerHTML = "<div class='section-title'>⚠️ Error fetching failed prints</div>";
+            }
+        }
+        
+        loadFailedPrints(); // Initial load
+    </script>
+</body>
+</html>

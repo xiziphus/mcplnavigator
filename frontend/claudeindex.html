@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Machine Work Order Assignment Dashboard</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+
+        :root {
+            --primary-color: #3b82f6;
+            --primary-dark: #2563eb;
+            --secondary-color: #1e293b;
+            --accent-color: #10b981;
+            --danger-color: #ef4444;
+            --warning-color: #f59e0b;
+            --success-color: #22c55e;
+            --background: #0f172a;
+            --surface: #1e293b;
+            --surface-hover: #334155;
+            --text-primary: #f8fafc;
+            --text-secondary: #cbd5e1;
+            --text-muted: #64748b;
+            --border: #334155;
+            --border-light: #475569;
+            --glass-bg: rgba(30, 41, 59, 0.8);
+            --glass-border: rgba(203, 213, 225, 0.1);
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: auto;
+        }
+
+        .header {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--glass-border);
+            padding: 1rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header h1 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr 400px;
+            gap: 1.5rem;
+            padding: 2rem;
+            max-width: 1800px;
+            margin: 0 auto;
+            min-height: calc(100vh - 100px);
+        }
+
+        .panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            transition: all 0.3s ease;
+            overflow: hidden;
+        }
+
+        .panel:hover {
+            border-color: var(--primary-color);
+            box-shadow: 0 25px 50px -12px rgba(59, 130, 246, 0.25);
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .panel-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .control-row {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .input-group {
+            position: relative;
+            flex: 1;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 0.75rem 1rem 0.75rem 2.5rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.875rem;
+            transition: all 0.3s ease;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .input-group i {
+            position: absolute;
+            left: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            pointer-events: none;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            text-decoration: none;
+            white-space: nowrap;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, var(--success-color), var(--accent-color));
+            color: white;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(34, 197, 94, 0.3);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, var(--danger-color), #dc2626);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(239, 68, 68, 0.3);
+        }
+
+        .btn-small {
+            padding: 0.5rem 1rem;
+            font-size: 0.75rem;
+        }
+
+        .content-area {
+            max-height: 600px;
+            overflow-y: auto;
+            padding-right: 0.5rem;
+        }
+
+        .content-area::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .content-area::-webkit-scrollbar-track {
+            background: var(--surface);
+            border-radius: 3px;
+        }
+
+        .content-area::-webkit-scrollbar-thumb {
+            background: var(--border-light);
+            border-radius: 3px;
+        }
+
+        .content-area::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-color);
+        }
+
+        .work-order-item, .machine-item {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            cursor: grab;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        .work-order-item[draggable="true"] {
+            cursor: grab;
+        }
+
+        .work-order-item[draggable="true"]:active {
+            cursor: grabbing;
+        }
+
+        .work-order-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+        }
+
+        .work-order-item:hover, .machine-item:hover {
+            transform: translateY(-2px);
+            border-color: var(--primary-color);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        .work-order-item:active {
+            cursor: grabbing;
+            transform: rotate(5deg) scale(0.95);
+            z-index: 1000;
+        }
+
+        .machine-item {
+            background: linear-gradient(135deg, var(--surface), var(--surface-hover));
+            min-height: 120px;
+            position: relative;
+        }
+
+        .machine-item.assigned::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: linear-gradient(135deg, var(--success-color), var(--accent-color));
+        }
+
+        .drop-target {
+            border-color: var(--accent-color) !important;
+            background: rgba(16, 185, 129, 0.1) !important;
+            transform: scale(1.02);
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+        }
+
+        .drop-target::after {
+            content: '📋 Drop Work Order Here';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(16, 185, 129, 0.9);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.75rem;
+        }
+
+        .item-title {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+        }
+
+        .item-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .detail-item {
+            display: flex;
+            flex-direction: column;
+            gap: 0.125rem;
+        }
+
+        .detail-label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .detail-value {
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-active {
+            background: rgba(34, 197, 94, 0.2);
+            color: var(--success-color);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+
+        .status-inactive {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--danger-color);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .machine-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.5rem;
+            margin: 0.75rem 0;
+            padding: 0.75rem;
+            background: var(--background);
+            border-radius: 8px;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+
+        .stat-label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .log-entry {
+            padding: 0.5rem;
+            margin-bottom: 0.5rem;
+            background: var(--surface);
+            border-left: 3px solid var(--primary-color);
+            border-radius: 0 8px 8px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            line-height: 1.4;
+            transition: all 0.3s ease;
+        }
+
+        .log-entry:hover {
+            background: var(--surface-hover);
+            transform: translateX(2px);
+        }
+
+        .drag-hint {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-muted);
+            font-style: italic;
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            margin-top: 1rem;
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            color: var(--text-muted);
+        }
+
+        .spinner {
+            border: 2px solid var(--border);
+            border-top: 2px solid var(--primary-color);
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            margin-right: 0.5rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @media (max-width: 1400px) {
+            .dashboard {
+                grid-template-columns: 1fr 1fr;
+                grid-template-rows: auto auto;
+            }
+            
+            .mqtt-panel {
+                grid-column: 1 / -1;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+                padding: 1rem;
+                gap: 1rem;
+            }
+            
+            .control-row {
+                flex-direction: column;
+            }
+            
+            .item-details {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1><i class="fas fa-industry"></i> MCPL Manufacturing Control Center- PS</h1>
+    </header>
+
+    <div class="dashboard">
+        <!-- Work Orders Panel -->
+        <div class="panel">
+            <div class="panel-header">
+                <div class="panel-title">
+                    <i class="fas fa-clipboard-list"></i>
+                    Available Work Orders
+                </div>
+            </div>
+
+            <div class="controls">
+                <div class="control-row">
+                    <div class="input-group">
+                        <i class="fas fa-calendar"></i>
+                        <input type="date" id="created-at-min" placeholder="Select date">
+                    </div>
+                    <button id="fetch-btn" class="btn btn-primary">
+                        <i class="fas fa-download"></i>
+                        Fetch from NetSuite
+                    </button>
+                </div>
+                <div class="control-row">
+                    <div class="input-group">
+                        <i class="fas fa-cogs"></i>
+                        <input type="text" id="process-filter" placeholder="Filter by MFG Process">
+                    </div>
+                    <div class="input-group">
+                        <i class="fas fa-map-marker-alt"></i>
+                        <input type="text" id="location-filter" placeholder="Filter by Location">
+                    </div>
+                </div>
+            </div>
+
+            <div id="wo-list" class="content-area">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    Loading work orders...
+                </div>
+            </div>
+        </div>
+
+        <!-- Machines Panel -->
+        <div class="panel">
+            <div class="panel-header">
+                <div class="panel-title">
+                    <i class="fas fa-industry"></i>
+                    Machine Assignments
+                </div>
+            </div>
+
+            <div id="machine-list" class="content-area">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    Loading machines...
+                </div>
+            </div>
+        </div>
+
+        <!-- MQTT Log Panel -->
+        <div class="panel mqtt-panel">
+            <div class="panel-header">
+                <div class="panel-title">
+                    <i class="fas fa-wifi"></i>
+                    Live MQTT Log
+                </div>
+                <div class="status-badge status-active pulse">
+                    <i class="fas fa-circle"></i> Live
+                </div>
+            </div>
+
+            <div id="mqtt-log-display" class="content-area">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    Connecting to MQTT...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://127.0.0.1:3001';
+
+        const woList = document.getElementById('wo-list');
+        const machineList = document.getElementById('machine-list');
+        const mqttLogDisplay = document.getElementById('mqtt-log-display');
+        const processFilterInput = document.getElementById('process-filter');
+        const locationFilterInput = document.getElementById('location-filter');
+        const fetchBtn = document.getElementById('fetch-btn');
+        const createdAtMinInput = document.getElementById('created-at-min');
+
+        // Make items draggable with enhanced feedback
+        function makeDraggable(item) {
+            item.setAttribute('draggable', true);
+            item.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('work_order_id', item.dataset.id);
+                e.dataTransfer.setData('work_order_text', item.textContent);
+                item.style.opacity = '0.7';
+                item.style.transform = 'rotate(5deg)';
+            });
+            
+            item.addEventListener('dragend', (e) => {
+                item.style.opacity = '1';
+                item.style.transform = 'none';
+            });
+        }
+        
+        // Enhanced drop functionality
+        function makeDroppable(machine) {
+            machine.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                machine.classList.add('drop-target');
+            });
+            
+            machine.addEventListener('dragleave', (e) => {
+                if (!machine.contains(e.relatedTarget)) {
+                    machine.classList.remove('drop-target');
+                }
+            });
+            
+            machine.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                machine.classList.remove('drop-target');
+                const workOrderId = e.dataTransfer.getData('work_order_id');
+                const machineId = machine.dataset.id;
+                
+                // Show loading state
+                const originalContent = machine.innerHTML;
+                machine.innerHTML = '<div class="loading"><div class="spinner"></div>Assigning...</div>';
+                
+                try {
+                    await fetch(`${API_BASE_URL}/api/update-assignment`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            machine_id: parseInt(machineId),
+                            work_order_id: parseInt(workOrderId),
+                            is_printing_active: true
+                        })
+                    });
+                    
+                    loadData();
+                } catch (error) {
+                    console.error('Assignment failed:', error);
+                    machine.innerHTML = originalContent;
+                }
+            });
+        }
+        
+        async function loadData() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/dashboard-data`);
+                const data = await response.json();
+
+                // Populate Work Orders with enhanced UI
+                const processFilterText = processFilterInput.value.toLowerCase();
+                const locationFilterText = locationFilterInput.value.toLowerCase();
+
+                const filteredWorkOrders = data.work_orders.filter(wo => {
+                    const processMatch = !processFilterText || (wo.mfg_process_name || '').toLowerCase().includes(processFilterText);
+                    const locationMatch = !locationFilterText || (wo.location || '').toLowerCase().includes(locationFilterText);
+                    return processMatch && locationMatch;
+                });
+
+                if (filteredWorkOrders.length === 0) {
+                    woList.innerHTML = '<div class="drag-hint"><i class="fas fa-inbox"></i><br>No work orders found</div>';
+                } else {
+                    woList.innerHTML = '';
+                    filteredWorkOrders.forEach(wo => {
+                        const div = document.createElement('div');
+                        div.className = 'work-order-item';
+                        div.dataset.id = wo.id;
+                        div.innerHTML = `
+                            <div class="item-header">
+                                <div class="item-title">WO: ${wo.work_order_no || 'N/A'}</div>
+                                <div class="status-badge" style="background: rgba(59, 130, 246, 0.2); color: var(--primary-color);">
+                                    ${wo.work_order_date || 'N/A'}
+                                </div>
+                            </div>
+                            <div class="item-details">
+                                <div class="detail-item">
+                                    <span class="detail-label">Process</span>
+                                    <span class="detail-value">${wo.mfg_process_name || 'N/A'}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Quantity</span>
+                                    <span class="detail-value">${wo.total_quantity || 'N/A'}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">MCPL P/N</span>
+                                    <span class="detail-value">${wo.mcpl_part_code || 'N/A'}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Customer P/N</span>
+                                    <span class="detail-value">${wo.customer_part_code || 'N/A'}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Location</span>
+                                    <span class="detail-value">${wo.location || 'N/A'}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Wire Type</span>
+                                    <span class="detail-value">${wo.wire_type || 'N/A'}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Gauge</span>
+                                    <span class="detail-value">${wo.guage || 'N/A'}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Colors</span>
+                                    <span class="detail-value">${wo.main_color || 'N/A'} / ${wo.bi_color || 'N/A'}</span>
+                                </div>
+                            </div>
+                            <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted); font-size: 0.75rem;">
+                                <i class="fas fa-hand-pointer"></i> Drag to assign to machine
+                            </div>
+                        `;
+                        makeDraggable(div);
+                        woList.appendChild(div);
+                    });
+                }
+
+                // Populate Machines with enhanced UI
+                if (data.assignments.length === 0) {
+                    machineList.innerHTML = '<div class="drag-hint"><i class="fas fa-industry"></i><br>No machines available</div>';
+                } else {
+                    machineList.innerHTML = '';
+                    data.assignments.forEach(m => {
+                        const div = document.createElement('div');
+                        div.className = 'machine-item assigned';
+                        div.dataset.id = m.machine_id;
+                        
+                        const isActive = m.is_printing_active;
+                        const hasWorkOrder = m.work_order_no && m.work_order_no !== 'None';
+                        
+                        div.innerHTML = `
+                            <div class="item-header">
+                                <div class="item-title">${m.equipment_name}</div>
+                                <div class="status-badge ${isActive ? 'status-active' : 'status-inactive'}">
+                                    <i class="fas fa-${isActive ? 'play' : 'pause'}"></i>
+                                    ${isActive ? 'Active' : 'Inactive'}
+                                </div>
+                            </div>
+                            
+                            ${hasWorkOrder ? `
+                                <div class="detail-item" style="margin-bottom: 0.75rem;">
+                                    <span class="detail-label">Assigned Work Order</span>
+                                    <span class="detail-value">${m.work_order_no}</span>
+                                </div>
+                                
+                                <div class="machine-stats">
+                                    <div class="stat">
+                                        <div class="stat-value">${m.total_coils_produced || 0}</div>
+                                        <div class="stat-label">Total Coils</div>
+                                    </div>
+                                    <div class="stat">
+                                        <div class="stat-value">${m.recent_coil_quantity || 0}</div>
+                                        <div class="stat-label">Recent Qty</div>
+                                    </div>
+                                    <div class="stat">
+                                        <div class="stat-value">${m.total_quantity_made || 0}</div>
+                                        <div class="stat-label">Total Made</div>
+                                    </div>
+                                </div>
+                                
+                                ${m.recent_coil_serial_number ? `
+                                    <div class="detail-item" style="margin-bottom: 0.75rem;">
+                                        <span class="detail-label">Recent Serial Number</span>
+                                        <span class="detail-value">${m.recent_coil_serial_number}</span>
+                                    </div>
+                                ` : ''}
+                                
+                                <button class="btn ${isActive ? 'btn-danger' : 'btn-success'} btn-small toggle-btn" 
+                                        data-machine-id="${m.machine_id}" 
+                                        data-wo-id="${m.work_order_id}" 
+                                        data-active="${isActive}">
+                                    <i class="fas fa-${isActive ? 'pause' : 'play'}"></i>
+                                    ${isActive ? 'Deactivate' : 'Activate'}
+                                </button>
+                            ` : `
+                                <div class="drag-hint">
+                                    <i class="fas fa-hand-pointer"></i><br>
+                                    Drag a work order here to assign
+                                </div>
+                            `}
+                        `;
+                        
+                        makeDroppable(div);
+                        machineList.appendChild(div);
+                    });
+                }
+
+                // Add event listeners to toggle buttons
+                document.querySelectorAll('.toggle-btn').forEach(btn => {
+                    btn.addEventListener('click', async (e) => {
+                        const machineId = e.target.dataset.machineId;
+                        const workOrderId = e.target.dataset.woId;
+                        const isActive = e.target.dataset.active === 'true';
+
+                        if (!workOrderId || workOrderId === 'null') {
+                            return;
+                        }
+                        
+                        // Show loading state
+                        const originalText = e.target.innerHTML;
+                        e.target.innerHTML = '<div class="spinner" style="width: 12px; height: 12px; margin-right: 0.25rem;"></div>Working...';
+                        e.target.disabled = true;
+                        
+                        try {
+                            await fetch(`${API_BASE_URL}/api/update-assignment`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    machine_id: parseInt(machineId),
+                                    work_order_id: parseInt(workOrderId),
+                                    is_printing_active: !isActive
+                                })
+                            });
+                            loadData();
+                        } catch (error) {
+                            console.error('Toggle failed:', error);
+                            e.target.innerHTML = originalText;
+                            e.target.disabled = false;
+                        }
+                    });
+                });
+            } catch (error) {
+                console.error('Failed to load data:', error);
+                woList.innerHTML = '<div class="drag-hint"><i class="fas fa-exclamation-triangle"></i><br>Failed to load work orders</div>';
+                machineList.innerHTML = '<div class="drag-hint"><i class="fas fa-exclamation-triangle"></i><br>Failed to load machines</div>';
+            }
+        }
+
+        // Enhanced fetch functionality
+        fetchBtn.addEventListener('click', async () => {
+            const createdAtMin = createdAtMinInput.value;
+            if (!createdAtMin) {
+                alert("Please select a date.");
+                return;
+            }
+
+            const originalText = fetchBtn.innerHTML;
+            fetchBtn.innerHTML = '<div class="spinner" style="width: 12px; height: 12px; margin-right: 0.25rem;"></div>Fetching...';
+            fetchBtn.disabled = true;
+            
+            try {
+                await fetch(`${API_BASE_URL}/api/fetch-netsuite-orders`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ created_at_min: createdAtMin })
+                });
+                loadData();
+            } catch (error) {
+                console.error('Fetch failed:', error);
+            } finally {
+                fetchBtn.innerHTML = originalText;
+                fetchBtn.disabled = false;
+            }
+        });
+
+        // Enhanced filter functionality with debouncing
+        let filterTimeout;
+        function debounceFilter() {
+            clearTimeout(filterTimeout);
+            filterTimeout = setTimeout(loadData, 300);
+        }
+
+        processFilterInput.addEventListener('input', debounceFilter);
+        locationFilterInput.addEventListener('input', debounceFilter);
+
+        // Enhanced MQTT log functionality
+        async function loadMqttLog() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/mqtt-log`);
+                if (!response.ok) {
+                    mqttLogDisplay.innerHTML = '<div class="drag-hint"><i class="fas fa-wifi"></i><br>MQTT connection unavailable</div>';
+                    return;
+                }
+                
+                const data = await response.json();
+                mqttLogDisplay.innerHTML = '';
+                
+                if (data.log.length === 0) {
+                    mqttLogDisplay.innerHTML = '<div class="drag-hint"><i class="fas fa-satellite-dish"></i><br>No MQTT messages yet</div>';
+                } else {
+                    // Display newest messages first
+                    data.log.slice().reverse().forEach((logEntry, index) => {
+                        const div = document.createElement('div');
+                        div.className = 'log-entry';
+                        div.style.animationDelay = `${index * 0.1}s`;
+                        div.innerHTML = `<i class="fas fa-circle" style="color: var(--success-color); font-size: 0.5rem; margin-right: 0.5rem;"></i>${logEntry}`;
+                        mqttLogDisplay.appendChild(div);
+                    });
+                }
+            } catch (error) {
+                console.error("Error fetching MQTT log:", error);
+                mqttLogDisplay.innerHTML = '<div class="drag-hint"><i class="fas fa-exclamation-triangle"></i><br>Failed to load MQTT log</div>';
+            }
+        }
+
+        // Auto-refresh functionality
+        setInterval(loadMqttLog, 3000);
+        setInterval(loadData, 30000); // Refresh data every 30 seconds
+
+        // Initial load
+        loadData();
+        loadMqttLog();
+
+        // Set default date to today
+        const today = new Date().toISOString().split('T')[0];
+        createdAtMinInput.value = today;
+
+        // Add keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                switch(e.key) {
+                    case 'r':
+                        e.preventDefault();
+                        loadData();
+                        break;
+                    case 'f':
+                        e.preventDefault();
+                        processFilterInput.focus();
+                        break;
+                }
+            }
+        });
+
+        // Add connection status indicator
+        let connectionStatus = true;
+        setInterval(async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/dashboard-data`);
+                if (response.ok && !connectionStatus) {
+                    connectionStatus = true;
+                    document.body.style.filter = 'none';
+                }
+            } catch (error) {
+                if (connectionStatus) {
+                    connectionStatus = false;
+                    document.body.style.filter = 'grayscale(0.5)';
+                }
+            }
+        }, 10000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Machine Work Order Assignment</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f3f4f6;
+      display: flex;
+      gap: 20px;
+      height: 100vh;
+      box-sizing: border-box;
+    }
+
+    .panel {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
+      padding: 20px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 300px;
+      overflow: hidden;
+    }
+
+    h2 {
+      margin: 0 0 16px;
+      font-size: 1.25rem;
+      color: #111827;
+    }
+
+    input[type="text"] {
+      padding: 8px 10px;
+      margin: 4px 0;
+      font-size: 0.95rem;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    button {
+      padding: 10px 14px;
+      background-color: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    button:hover {
+      background-color: #1d4ed8;
+    }
+
+    .wo-list, .machine-list, .mqtt-log-display {
+      flex: 1;
+      overflow-y: auto;
+      border-radius: 8px;
+      background: #f9fafb;
+      padding: 10px;
+      margin-top: 12px;
+      border: 1px dashed #e5e7eb;
+      font-size: 0.9rem;
+      word-break: break-word;
+    }
+
+    .item {
+      background-color: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 10px;
+      margin-bottom: 10px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+      cursor: grab;
+      transition: transform 0.1s ease;
+    }
+
+    .item:hover {
+      transform: scale(1.01);
+      background-color: #f1f5f9;
+    }
+
+    .assigned {
+      background-color: #ecfdf5;
+      border-color: #34d399;
+    }
+
+    .drop-target {
+      border: 2px dashed #93c5fd;
+      background-color: #eff6ff;
+    }
+
+    .toggle-btn {
+      background-color: #6b7280;
+      margin-top: 8px;
+    }
+
+    .toggle-btn:hover {
+      background-color: #4b5563;
+    }
+  </style>
+</head>
+<body>
+
+    <div class="panel">
+        <h2>Available Extrusion Work Orders</h2>
+        <input type="text" id="created-at-min" placeholder="YYYY-MM-DD">
+        <button id="fetch-btn">Fetch from NetSuite</button><br>
+        <input type="text" id="process-filter" placeholder="Filter by MFG Process" style="margin-top: 10px; width: calc(50% - 16px);">
+        <input type="text" id="location-filter" placeholder="Filter by Location" style="margin-top: 10px; width: calc(50% - 16px);">
+        <div id="wo-list" class="wo-list">
+            <!-- Work orders will be loaded here -->
+        </div>
+    </div>
+
+    <div class="panel">
+        <h2>Machine Assignments</h2>
+        <div id="machine-list" class="machine-list">
+            <!-- Machines will be loaded here -->
+        </div>
+    </div>
+
+    <div class="panel">
+        <h2>Live MQTT Log</h2>
+        <div id="mqtt-log-display" class="mqtt-log-display">
+            <!-- MQTT messages will be loaded here -->
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://127.0.0.1:3001'; // Your FastAPI server URL
+
+        const woList = document.getElementById('wo-list');
+        const machineList = document.getElementById('machine-list');
+        const mqttLogDisplay = document.getElementById('mqtt-log-display');
+        // const refreshBtn = document.getElementById('refresh-btn'); // Already have fetchBtn
+        const processFilterInput = document.getElementById('process-filter');
+        const locationFilterInput = document.getElementById('location-filter');
+
+        // Make items draggable
+        function makeDraggable(item) {
+            item.setAttribute('draggable', true);
+            item.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('work_order_id', item.dataset.id);
+                e.dataTransfer.setData('work_order_text', item.textContent);
+            });
+        }
+        
+        // Make machine a drop target
+        function makeDroppable(machine) {
+            machine.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                machine.classList.add('drop-target');
+            });
+            machine.addEventListener('dragleave', () => {
+                machine.classList.remove('drop-target');
+            });
+            machine.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                machine.classList.remove('drop-target');
+                const workOrderId = e.dataTransfer.getData('work_order_id');
+                const workOrderText = e.dataTransfer.getData('work_order_text');
+                const machineId = machine.dataset.id;
+                
+                // API call to update assignment
+                await fetch(`${API_BASE_URL}/api/update-assignment`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        machine_id: parseInt(machineId),
+                        work_order_id: parseInt(workOrderId),
+                        is_printing_active: true // Default to active on drop
+                    })
+                });
+                
+                // Refresh UI
+                loadData();
+            });
+        }
+        
+        async function loadData() {
+            const response = await fetch(`${API_BASE_URL}/api/dashboard-data`);
+            const data = await response.json();
+
+            // Populate Work Orders
+            woList.innerHTML = '<h4>Drag a WO to a Machine</h4>';
+            
+            const processFilterText = processFilterInput.value.toLowerCase();
+            const locationFilterText = locationFilterInput.value.toLowerCase();
+
+            const filteredWorkOrders = data.work_orders.filter(wo => {
+                const processMatch = !processFilterText || (wo.mfg_process_name || '').toLowerCase().includes(processFilterText);
+                const locationMatch = !locationFilterText || (wo.location || '').toLowerCase().includes(locationFilterText);
+                return processMatch && locationMatch;
+            });
+
+            filteredWorkOrders.forEach(wo => {
+                const div = document.createElement('div');
+                div.className = 'item';
+                div.dataset.id = wo.id;
+                div.innerHTML = `
+                    <strong>WO: ${wo.work_order_no || 'N/A'}</strong> (Date: ${wo.work_order_date || 'N/A'}) (Process: ${wo.mfg_process_name || 'N/A'})<br>
+                    MCPL P/N: ${wo.mcpl_part_code || 'N/A'} (Qty: ${wo.total_quantity || 'N/A'})<br>
+                    Cust P/N: ${wo.customer_part_code || 'N/A'}<br>
+                    Location: ${wo.location || 'N/A'}<br>
+                    Wire Type: ${wo.wire_type || 'N/A'}<br>
+                    Gauge: ${wo.guage || 'N/A'}<br>
+                    Color: ${wo.main_color || 'N/A'} / ${wo.bi_color || 'N/A'}
+                `;
+                makeDraggable(div);
+                woList.appendChild(div);
+            });
+
+            // Populate Machines
+            machineList.innerHTML = '';
+            data.assignments.forEach(m => {
+                const div = document.createElement('div');
+                div.className = 'item assigned';
+                div.dataset.id = m.machine_id;
+                div.innerHTML = `<strong>${m.equipment_name}</strong><br>
+                    <span>Assigned WO: ${m.work_order_no || 'None'}</span><br>
+                    <span>Printing: <strong>${m.is_printing_active ? 'ACTIVE' : 'INACTIVE'}</strong></span><br>
+                    <span>Total Coils: ${m.total_coils_produced !== undefined ? m.total_coils_produced : 'N/A'}</span><br>
+                    <span>Recent S/N: ${m.recent_coil_serial_number || 'N/A'}</span><br>
+                    <span>Recent Qty: ${m.recent_coil_quantity !== undefined ? m.recent_coil_quantity : 'N/A'}</span><br>
+                    <span>Total Qty Made: ${m.total_quantity_made !== undefined ? m.total_quantity_made : 'N/A'}</span><br>
+                    <span>Recent Print Status: ${m.recent_print_status || 'N/A'}</span><br>
+                    <span>Error: ${m.recent_error_message || 'None'}</span>
+                    <button class="toggle-btn" data-machine-id="${m.machine_id}" data-wo-id="${m.work_order_id}" data-active="${m.is_printing_active}">
+                        ${m.is_printing_active ? 'Deactivate' : 'Activate'}
+                    </button>`;
+                makeDroppable(div);
+                machineList.appendChild(div);
+            });
+
+            // Add event listeners to new toggle buttons
+            document.querySelectorAll('.toggle-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const machineId = e.target.dataset.machineId;
+                    const workOrderId = e.target.dataset.woId;
+                    const isActive = e.target.dataset.active === 'true';
+
+                    if (!workOrderId || workOrderId === 'null') {
+                        alert("No Work Order assigned. Cannot toggle printing.");
+                        return;
+                    }
+                    
+                    await fetch(`${API_BASE_URL}/api/update-assignment`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            machine_id: parseInt(machineId),
+                            work_order_id: parseInt(workOrderId),
+                            is_printing_active: !isActive
+                        })
+                    });
+                    loadData(); // Refresh UI
+                });
+            });
+        }
+        
+        const fetchBtn = document.getElementById('fetch-btn');
+        const createdAtMinInput = document.getElementById('created-at-min');
+
+        fetchBtn.addEventListener('click', async () => {
+            const createdAtMin = createdAtMinInput.value;
+            if (!createdAtMin) {
+                alert("Please enter a date in YYYY-MM-DD format.");
+                return;
+            }
+
+            fetchBtn.textContent = 'Fetching...';
+            await fetch(`${API_BASE_URL}/api/fetch-netsuite-orders`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ created_at_min: createdAtMin })
+            });
+            fetchBtn.textContent = 'Fetch from NetSuite';
+            loadData();
+        });
+
+        processFilterInput.addEventListener('keyup', loadData);
+        locationFilterInput.addEventListener('keyup', loadData); // Re-filter and load data on keyup
+
+        // Initial load
+        loadData();
+
+        async function loadMqttLog() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/mqtt-log`);
+                if (!response.ok) {
+                    console.error("Failed to fetch MQTT log:", response.status);
+                    // mqttLogDisplay.innerHTML = "<p>Error fetching MQTT log.</p>";
+                    return;
+                }
+                const data = await response.json();
+                mqttLogDisplay.innerHTML = ''; // Clear previous logs
+                // Display newest messages first
+                data.log.slice().reverse().forEach(logEntry => {
+                    const p = document.createElement('p');
+                    p.style.margin = '2px 0';
+                    p.style.borderBottom = '1px solid #eee';
+                    p.style.paddingBottom = '2px';
+                    p.textContent = logEntry;
+                    mqttLogDisplay.appendChild(p);
+                });
+            } catch (error) {
+                console.error("Error fetching or processing MQTT log:", error);
+                // mqttLogDisplay.innerHTML = "<p>Error fetching MQTT log.</p>";
+            }
+        }
+
+        // Load MQTT log periodically
+        setInterval(loadMqttLog, 3000); // Refresh every 3 seconds
+        loadMqttLog(); // Initial load
+
+    </script>
+</body>
+</html>
