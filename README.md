@@ -1,4 +1,4 @@
-# Label Printing and Work Order Management System
+# Automatic Label Printing and Work Order Management System for Cable Manufacturing using Auto-coilers
 
 ## Overview
 
