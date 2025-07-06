@@ -4,6 +4,16 @@
 
 This application is designed to integrate with NetSuite to fetch work orders, manage machine assignments for these work orders, and interact with an MQTT broker to receive real-time data from shop floor machines (Autocoilers). Based on MQTT triggers and active assignments, it generates ZPL labels for printing and logs production data. The system features a web-based UI for monitoring and managing assignments.
 
+## Problem Statement
+
+In many discrete manufacturing environments, particularly in industries like cable manufacturing, a critical gap exists between real-time shop-floor activities and the central enterprise resource planning (ERP) system. This disconnection typically results in:
+
+*   **Manual Data Entry:** Operators or supervisors must manually record production output, quality status, and material consumption, leading to delays and a high risk of human error.
+*   **Delayed Visibility:** Management has no real-time view of production status. Reports are often hours or days old, making proactive decision-making impossible.
+*   **Traceability Challenges:** Manually created labels and production logs make it difficult to maintain a robust, auditable trail for each product, a key requirement for quality standards like IATF 16949.
+
+This application was architected and built as a proof-of-concept to solve these core challenges. It serves as a blueprint for a system that creates a direct, automated link between MQTT-enabled shop-floor machines and a NetSuite ERP, enabling automated label printing, real-time production logging, and a single source of truth for manufacturing operations.
+
 ## Features
 
 *   **NetSuite Integration:** Fetches work orders using a RESTlet.
